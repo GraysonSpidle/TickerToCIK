@@ -4,6 +4,7 @@ Author: Grayson Spidle
 
 This code is open source, I don't care if you use it anywhere else. No legal red tape from me.
 '''
+__author__ = "Grayson Spidle"
 
 import re
 from requests import get
@@ -14,7 +15,7 @@ from progressbar import progressbar
 def get_CIK(ticker) -> str:
     ''' Gets the CIK from the SEC's website given a ticker. 
     This works as of 11/20/2019, it might not work in the future because the SEC might change their site (unlikely, but possible)
-    Also, the SEC limits connections it serves from one IP address to 5 per second. If exceeded, it'll deny service for a short period of time.
+    Also, the SEC limits connections it serves from one IP address to 10 per second. If exceeded, it'll deny service for a short period of time.
 
     Parameters
     ----------
@@ -28,10 +29,10 @@ def get_CIK(ticker) -> str:
     '''
     url = "https://www.sec.gov/cgi-bin/browse-edgar?CIK=%s&owner=exclude&action=getcompany" % (ticker.strip().replace("\n",""))
     conn = get(url)
-    data = get(url).content.decode()
+    data = conn.content.decode()
     assert conn.ok, "Connection wasn't successful. Perhaps you exceeded the maximum allowed connections per second."
     try:
-        value = re.findall("([0-9]*) \\(see all company filings\\)", data)[0].replace("\n","")
+        value = re.findall(r"([0-9]*) \(see all company filings\)", data)[0].replace("\n","")
     except:
         value = None
     conn.close()
@@ -42,8 +43,12 @@ def _get_CIKs_multithread(tickers) -> dict:
     a dictionary with each ticker mapped to its own CIK.
     This does the requests to the SEC's website using parallel programming (multi-threading) which makes the job go faster than its sequential counterpart.
     However, this one runs the risk of exceeding the SEC's request limit (it shouldn't, but it's definitely a possibility). In which case will hamper accuracy and performance.
+
+    Returns
+    -------
+    returns a dictionary of each ticker mapped to its associated CIK
     '''
-    numberOfConnectionsPerSecond = 5 # Limit the number of connections we make to 5 per second
+    numberOfConnectionsPerSecond = 10 # Limit the number of connections we make to 10 per second
 
     output = {}
     threads = []
@@ -70,7 +75,7 @@ def get_CIKs(tickers, enableMultiThreading:bool = True) -> dict:
     ''' Gets CIKs from the SEC's website given a collection of tickers. It won't neccessarily preserve the order of the tickers.
 
     This works as of 11/20/2019, it might not work in the future because the SEC might change their site (unlikely, but possible).
-    Also, the SEC limits connections it serves from one IP address to 5 per second. If exceeded, it'll deny service for a short period of time.
+    Also, the SEC limits connections it serves from one IP address to 10 per second. If exceeded, it'll deny service for a short period of time.
 
     Parameters
     ----------
@@ -106,7 +111,7 @@ def get_CIKs(tickers, enableMultiThreading:bool = True) -> dict:
 
 def get_CIKs_file_to_file(tickerFilePath:str, outputFilePath:str, delim:str = "\n", enableMultiThreading:bool = True):
     ''' Reads a file of tickers delimited by the supplied delimiter and gets the corresponding CIK and puts both of those into a
-    file (it truncates the existing information in the file) in the format of: ticker,CIK\\n
+    file (it truncates the existing information in the file) in the format of: ticker,CIK
 
     Tickers that the program fails to find a CIK for default to the value of None.
     Note: this doesn't guarantee that the output will preserve the order of the tickers in the output file.
@@ -128,9 +133,10 @@ def get_CIKs_file_to_file(tickerFilePath:str, outputFilePath:str, delim:str = "\
         but won't hit the request per second limit. I recommend you use multi-threading because it's just way faster than the alternative.
 
     '''
-    out = open(outputFilePath, 'w')
-    with open(tickerFilePath) as file:
+    file = open(tickerFilePath)
+    with open(outputFilePath, 'w') as out:
         mapped = get_CIKs(file.read().split(delim), enableMultiThreading)
+        file.close()
         print("Writing data to file: %s" % outputFilePath)
         for ticker, cik in progressbar(mapped.items()):
             out.write("%s,%s\n" % (ticker,cik))

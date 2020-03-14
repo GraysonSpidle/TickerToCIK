@@ -4,6 +4,7 @@ Author: Grayson Spidle
 
 This code is open source, I don't care if you use it anywhere else. No legal red tape from me.
 '''
+__author__ = "Grayson Spidle"
 
 from threading import Thread
 from time import sleep
